@@ -1,4 +1,6 @@
 node_modules/
+.tools/
+.expo-node22*.log
 .expo/
 dist/
 npm-debug.*

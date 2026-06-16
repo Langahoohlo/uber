@@ -1,7 +1,11 @@
 module.exports = function (api) {
-  api.cache(true);
+  const platform = api.caller((caller) => caller?.platform);
+
   return {
     presets: ['babel-preset-expo'],
-    plugins: ["nativewind/babel"],
+    plugins: [
+      ...(platform === "web" ? ["react-native-web"] : []),
+      "nativewind/babel",
+    ],
   };
 };

@@ -3,9 +3,9 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
-import "react-native-reanimated";
-import { LogBox } from "react-native";
 
+import { ignoreClerkLogs } from "@/lib/log-box";
+import "@/lib/reanimated";
 import { tokenCache } from "@/lib/auth";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -19,7 +19,7 @@ if (!publishableKey) {
   );
 }
 
-LogBox.ignoreLogs(["Clerk:"]);
+ignoreClerkLogs();
 
 export default function RootLayout() {
   const [loaded] = useFonts({

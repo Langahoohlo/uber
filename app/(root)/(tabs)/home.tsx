@@ -17,7 +17,7 @@ import GoogleTextInput from "@/components/GoogleTextInput";
 import Map from "@/components/Map";
 import RideCard from "@/components/RideCard";
 import { icons, images } from "@/constants";
-import { useFetch } from "@/lib/fetch";
+import { fetchAPI, useFetch } from "@/lib/fetch";
 import { useLocationStore } from "@/store";
 import { Ride } from "@/types/type";
 
@@ -32,36 +32,85 @@ const Home = () => {
     router.replace("/(auth)/sign-in");
   };
 
-  const [hasPermission, setHasPermission] = useState<boolean>(false);
+  const [locationLoading, setLocationLoading] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const {
     data: recentRides,
     loading,
     error,
-  } = useFetch<Ride[]>(`/(api)/ride/${user?.id}`);
+  } = useFetch<Ride[]>(user?.id ? `/(api)/ride/${user.id}` : null);
 
   useEffect(() => {
+    let mounted = true;
+
+    const withTimeout = <T,>(promise: Promise<T>, ms: number) =>
+      Promise.race<T>([
+        promise,
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error("Location request timed out")), ms),
+        ),
+      ]);
+
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setHasPermission(false);
-        return;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (!mounted) return;
+
+        if (status !== "granted") {
+          setLocationError("Location permission was denied.");
+          return;
+        }
+
+        const location =
+          (await Location.getLastKnownPositionAsync({})) ??
+          (await withTimeout(
+            Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            }),
+            15000,
+          ));
+
+        if (!mounted) return;
+
+        const address = await Location.reverseGeocodeAsync({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+
+        setUserLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          address: address[0]
+            ? `${address[0].name ?? "Current location"}, ${address[0].region ?? ""}`
+            : "Current location",
+        });
+      } catch (err) {
+        if (mounted) setLocationError((err as Error).message);
+      } finally {
+        if (mounted) setLocationLoading(false);
       }
-
-      let location = await Location.getCurrentPositionAsync({});
-
-      const address = await Location.reverseGeocodeAsync({
-        latitude: location.coords?.latitude!,
-        longitude: location.coords?.longitude!,
-      });
-
-      setUserLocation({
-        latitude: location.coords?.latitude,
-        longitude: location.coords?.longitude,
-        address: `${address[0].name}, ${address[0].region}`,
-      });
     })();
-  }, []);
+
+    return () => {
+      mounted = false;
+    };
+  }, [setUserLocation]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    fetchAPI("/(api)/health")
+      .then((health) => {
+        console.log("[API] post-login health check ok", health);
+      })
+      .catch((err) => {
+        console.error("[API] post-login health check failed", {
+          errorName: err instanceof Error ? err.name : "UnknownError",
+          errorMessage: err instanceof Error ? err.message : String(err),
+        });
+      });
+  }, [user?.id]);
 
   const handleDestinationPress = (location: {
     latitude: number;
@@ -86,7 +135,9 @@ const Home = () => {
         }}
         ListEmptyComponent={() => (
           <View className="flex flex-col items-center justify-center">
-            {!loading ? (
+            {error ? (
+              <Text className="text-sm text-red-500 text-center">{error}</Text>
+            ) : !loading ? (
               <>
                 <Image
                   source={images.noResult}
@@ -126,7 +177,19 @@ const Home = () => {
                 Your current location
               </Text>
               <View className="flex flex-row items-center bg-transparent h-[300px]">
-                <Map />
+                {locationError ? (
+                  <View className="flex-1 items-center justify-center">
+                    <Text className="text-sm text-red-500 text-center">
+                      {locationError}
+                    </Text>
+                  </View>
+                ) : locationLoading ? (
+                  <View className="flex-1 items-center justify-center">
+                    <ActivityIndicator size="small" color="#000" />
+                  </View>
+                ) : (
+                  <Map />
+                )}
               </View>
             </>
 

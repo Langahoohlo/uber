@@ -14,7 +14,7 @@ const Rides = () => {
     data: recentRides,
     loading,
     error,
-  } = useFetch<Ride[]>(`/(api)/ride/${user?.id}`);
+  } = useFetch<Ride[]>(user?.id ? `/(api)/ride/${user.id}` : null);
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -29,7 +29,9 @@ const Rides = () => {
         }}
         ListEmptyComponent={() => (
           <View className="flex flex-col items-center justify-center">
-            {!loading ? (
+            {error ? (
+              <Text className="text-sm text-red-500 text-center">{error}</Text>
+            ) : !loading ? (
               <>
                 <Image
                   source={images.noResult}

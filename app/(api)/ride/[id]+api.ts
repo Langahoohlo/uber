@@ -30,7 +30,7 @@ export async function GET(request: Request, { id }: { id: string }) {
             ) AS driver 
         FROM 
             rides
-        INNER JOIN
+        LEFT JOIN
             drivers ON rides.driver_id = drivers.id
         WHERE 
             rides.user_id = ${id}
